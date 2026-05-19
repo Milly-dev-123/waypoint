@@ -1,8 +1,7 @@
 // Waypoint — Next.js config.
 // Hardens HTTP responses with CSP + a handful of standard security headers.
 // CSP includes the local Supabase port (54321) for dev and a wildcard
-// *.supabase.co for prod; when Leaflet lands in Phase 2 we'll add the tile
-// CDN to img-src + connect-src.
+// *.supabase.co for prod, plus CartoDB's tile CDN for the Leaflet map.
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -22,7 +21,8 @@ const nextConfig = {
               // component that emits one.
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              // CartoDB Positron tiles served from basemaps.cartocdn.com (dev only — will swap providers before non-dev deploy).
+              "img-src 'self' data: blob: https://*.basemaps.cartocdn.com",
               "font-src 'self' data:",
               "connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321 https://*.supabase.co wss://*.supabase.co",
               "frame-ancestors 'none'",
