@@ -9,6 +9,7 @@ import { MapClientOnly } from '@/components/map/MapClientOnly';
 import { SharingProvider } from '@/components/sharing/SharingProvider';
 import { SharingBanner } from '@/components/sharing/SharingBanner';
 import { StartSharingModal } from '@/components/sharing/StartSharingModal';
+import { ReceivedPositionsProvider } from '@/components/sharing/ReceivedPositionsProvider';
 import type { Profile } from '@/lib/auth/guards';
 import type { TabId } from '@/lib/app/tabs';
 
@@ -23,7 +24,8 @@ export function AppShell({ profile }: { profile: Profile }) {
 
   return (
     <SharingProvider>
-      <div className="flex h-screen w-screen flex-col overflow-hidden bg-bg">
+      <ReceivedPositionsProvider>
+        <div className="flex h-screen w-screen flex-col overflow-hidden bg-bg">
         <div id="sharing-banner">
           <SharingBanner />
         </div>
@@ -39,7 +41,8 @@ export function AppShell({ profile }: { profile: Profile }) {
           </main>
         </div>
         <StartSharingModal open={shareModalOpen} onClose={() => setShareModalOpen(false)} />
-      </div>
+        </div>
+      </ReceivedPositionsProvider>
     </SharingProvider>
   );
 }

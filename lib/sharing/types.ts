@@ -1,5 +1,17 @@
 // Shared types for the location-sharing feature.
 
+// A peer's most recently recorded position, joined with their display
+// name. Returned by latest_visible_positions(). Only includes users
+// the viewer can see by RLS — see can_see_location().
+export type VisiblePosition = {
+  user_id: string;
+  lat: number;
+  lng: number;
+  accuracy_m: number | null;
+  recorded_at: string;
+  display_name: string | null;
+};
+
 export type ActiveShare = {
   id: string;
   user_id: string;

@@ -6,7 +6,7 @@
 // SharingProvider. Both run as the user via cookies → JWT → PostgREST.
 
 import { createClient } from '@/lib/supabase/client';
-import type { ActiveShare } from './types';
+import type { ActiveShare, VisiblePosition } from './types';
 
 export async function listMyActiveShares(): Promise<ActiveShare[]> {
   const supabase = createClient();
@@ -22,6 +22,16 @@ export async function listMyActiveShares(): Promise<ActiveShare[]> {
 }
 
 type RecordResult = { ok: true } | { ok: false; code?: string; message: string };
+
+// Returns the latest point for every user the caller can see right
+// now (last 5 minutes), joined with display_name. Used by the marker
+// layer for both the initial paint and the post-realtime-burst refetch.
+export async function fetchLatestPositions(): Promise<VisiblePosition[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('latest_visible_positions');
+  if (error || !data) return [];
+  return data as VisiblePosition[];
+}
 
 export async function recordLocationPoint(args: {
   lat: number;

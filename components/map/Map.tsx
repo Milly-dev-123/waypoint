@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { LocateButton } from './LocateButton';
+import { MapContext } from './MapContext';
+import { MemberMarkers } from './MemberMarkers';
 
 // Plain Leaflet via useEffect — chosen over react-leaflet because v4
 // double-initialises the map under React 18 Strict Mode and v5 needs
@@ -57,7 +59,12 @@ export default function Map() {
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} aria-label="Map" className="h-full w-full bg-bg" />
-      {ready && <LocateButton mapRef={mapRef} />}
+      {ready && mapRef.current && (
+        <MapContext.Provider value={mapRef.current}>
+          <LocateButton mapRef={mapRef} />
+          <MemberMarkers />
+        </MapContext.Provider>
+      )}
     </div>
   );
 }
