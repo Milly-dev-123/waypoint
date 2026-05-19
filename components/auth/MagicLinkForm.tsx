@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { FormMessage } from '@/components/ui/FormMessage';
-import { SubmitButton } from './SubmitButton';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 import { requestMagicLink } from '@/lib/auth/actions';
 import { initialFormState } from '@/lib/auth/form-state';
 

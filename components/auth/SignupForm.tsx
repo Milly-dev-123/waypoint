@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/Checkbox';
 import { FormMessage } from '@/components/ui/FormMessage';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { SubmitButton } from './SubmitButton';
+import { SubmitButton } from '@/components/ui/SubmitButton';
 import { signUp } from '@/lib/auth/actions';
 import { initialFormState } from '@/lib/auth/form-state';
 

@@ -2,47 +2,45 @@
 
 import { X } from 'lucide-react';
 import { TABS, type TabId } from '@/lib/app/tabs';
+import { CirclesTab } from './tabs/CirclesTab';
+import { Placeholder } from './tabs/Placeholder';
 
-// Phase 2A: each non-map tab renders a placeholder describing what
-// will live here. Extracts into per-tab files as features land.
+type NonMapTab = Exclude<TabId, 'map'>;
 
 type Props = {
-  tab: Exclude<TabId, 'map'>;
+  tab: NonMapTab;
   onClose: () => void;
 };
 
-const PLACEHOLDERS: Record<Exclude<TabId, 'map'>, { heading: string; body: string }> = {
-  circles: {
-    heading: 'Your circles',
-    body: 'Create or join a circle to share your location with people you trust. Coming next.',
-  },
-  'public-pins': {
-    heading: 'Public pins',
-    body: 'A map of community resources — water, food, shelter, hazards. Land in milestone 2E.',
-  },
-  activity: {
-    heading: 'Activity',
-    body: 'A transparency log of who has seen your location and what you’ve done. Land in milestone 2F.',
-  },
-  settings: {
-    heading: 'Settings',
-    body: 'Profile, stop-all sharing, and account deletion. Land in milestone 2F.',
-  },
+// Dispatcher: each tab becomes its own component as features land. Tabs
+// that aren't built yet render a Placeholder describing what'll live
+// here. z-[1100] sits above Leaflet's z-1000 controls so the LocateButton
+// can't peek through an open panel on mobile.
+
+const PLACEHOLDER_COPY: Record<Exclude<NonMapTab, 'circles'>, string> = {
+  'public-pins': 'A map of community resources — water, food, shelter, hazards. Lands in milestone 2E.',
+  activity: 'A transparency log of who has seen your location and what you’ve done. Lands in milestone 2F.',
+  settings: 'Profile, stop-all sharing, and account deletion. Lands in milestone 2F.',
+};
+
+const HEADINGS: Record<NonMapTab, string> = {
+  circles: 'Your circles',
+  'public-pins': 'Public pins',
+  activity: 'Activity',
+  settings: 'Settings',
 };
 
 export function TabPanel({ tab, onClose }: Props) {
   const def = TABS.find((t) => t.id === tab);
-  const placeholder = PLACEHOLDERS[tab];
+  const heading = HEADINGS[tab];
 
   return (
     <aside
-      // z-[1100] sits above Leaflet's control layer (z-1000) so the
-      // LocateButton can't peek through an open panel on mobile.
-      className="absolute inset-x-0 bottom-0 top-0 z-[1100] flex flex-col bg-surface shadow-lift md:inset-y-0 md:left-0 md:right-auto md:w-[26rem] md:border-r md:border-border"
       aria-label={def?.label}
+      className="absolute inset-x-0 bottom-0 top-0 z-[1100] flex flex-col bg-surface shadow-lift md:inset-y-0 md:left-0 md:right-auto md:w-[26rem] md:border-r md:border-border"
     >
       <header className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="font-display text-lg font-semibold">{placeholder.heading}</h2>
+        <h2 className="font-display text-lg font-semibold">{heading}</h2>
         <button
           type="button"
           onClick={onClose}
@@ -53,7 +51,7 @@ export function TabPanel({ tab, onClose }: Props) {
         </button>
       </header>
       <div className="flex-1 overflow-y-auto p-4">
-        <p className="text-sm text-muted">{placeholder.body}</p>
+        {tab === 'circles' ? <CirclesTab /> : <Placeholder body={PLACEHOLDER_COPY[tab]} />}
       </div>
     </aside>
   );
