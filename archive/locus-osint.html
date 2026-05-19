@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LOCUS — OSINT Location Workbench</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-elev: #161b22;
+    --bg-elev-2: #1c2128;
+    --border: #2d333b;
+    --border-bright: #444c56;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-faint: #6e7681;
+    --accent: #ff6b35;
+    --accent-dim: #ff6b3520;
+    --success: #3fb950;
+    --warn: #d29922;
+    --danger: #f85149;
+    --info: #58a6ff;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --sans: 'Space Grotesk', system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== APP SHELL ===== */
+  .app {
+    display: grid;
+    grid-template-rows: 44px 1fr 180px;
+    grid-template-columns: 280px 1fr 320px;
+    grid-template-areas:
+      "header header header"
+      "layers map evidence"
+      "timeline timeline timeline";
+    height: 100vh;
+  }
+
+  /* ===== HEADER ===== */
+  .header {
+    grid-area: header;
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    font-size: 14px;
+  }
+  .brand-mark {
+    width: 20px; height: 20px;
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    position: relative;
+  }
+  .brand-mark::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+  .brand-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    border-left: 1px solid var(--border);
+    padding-left: 12px;
+    letter-spacing: 0.1em;
+  }
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .header-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--success);
+  }
+  .btn {
+    background: transparent;
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+  }
+  .btn-primary:hover { background: #ff8055; border-color: #ff8055; color: var(--bg); }
+
+  /* ===== PANELS ===== */
+  .panel {
+    background: var(--bg-elev);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    height: 36px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-elev-2);
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  .panel-title::before {
+    content: '◆ ';
+    color: var(--accent);
+  }
+  .panel-body { flex: 1; overflow-y: auto; padding: 8px; }
+  .panel-body::-webkit-scrollbar { width: 6px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+  /* ===== LAYERS PANEL ===== */
+  .layers { grid-area: layers; border-right: 1px solid var(--border); }
+  .layer-group { margin-bottom: 16px; }
+  .layer-group-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+  .layer-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    gap: 10px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.1s;
+    border-left: 2px solid transparent;
+  }
+  .layer-item:hover { background: var(--bg-elev-2); }
+  .layer-item.active {
+    background: var(--bg-elev-2);
+    border-left-color: var(--accent);
+  }
+  .layer-toggle {
+    width: 14px; height: 14px;
+    border: 1px solid var(--border-bright);
+    border-radius: 2px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .layer-item.active .layer-toggle {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .layer-item.active .layer-toggle::after {
+    content: '';
+    position: absolute;
+    left: 3px; top: 0px;
+    width: 4px; height: 8px;
+    border: solid var(--bg);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .layer-info { flex: 1; min-width: 0; }
+  .layer-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .layer-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .layer-badge {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+  }
+  .badge-stub {
+    background: var(--bg);
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+  }
+  .badge-ready {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+
+  /* ===== MAP ===== */
+  .map-container { grid-area: map; position: relative; }
+  #map { width: 100%; height: 100%; background: #0a0e14; }
+
+  /* Leaflet dark theme overrides */
+  .leaflet-container {
+    background: #0a0e14;
+    font-family: var(--mono);
+  }
+  .leaflet-control-zoom a {
+    background: var(--bg-elev) !important;
+    border: 1px solid var(--border-bright) !important;
+    color: var(--text) !important;
+    border-radius: 0 !important;
+  }
+  .leaflet-control-zoom a:hover {
+    background: var(--bg-elev-2) !important;
+    color: var(--accent) !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(13, 17, 23, 0.85) !important;
+    color: var(--text-faint) !important;
+    font-family: var(--mono) !important;
+    font-size: 9px !important;
+  }
+  .leaflet-control-attribution a { color: var(--text-dim) !important; }
+  .leaflet-popup-content-wrapper {
+    background: var(--bg-elev) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border-bright);
+    border-radius: 2px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .leaflet-popup-tip { background: var(--bg-elev) !important; }
+  .leaflet-popup-content { font-family: var(--sans); font-size: 12px; margin: 10px 12px; }
+
+  /* Coords readout */
+  .map-readout {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(13, 17, 23, 0.9);
+    border: 1px solid var(--border-bright);
+    padding: 6px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    z-index: 500;
+    backdrop-filter: blur(4px);
+  }
+  .map-readout span { color: var(--accent); }
+
+  .map-toolbar {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tool-btn {
+    width: 32px; height: 32px;
+    background: rgba(13, 17, 23, 0.9);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 14px;
+    backdrop-filter: blur(4px);
+    transition: all 0.15s;
+  }
+  .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .tool-btn.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+  /* Custom marker */
+  .osint-marker {
+    width: 14px; height: 14px;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--accent), 0 0 10px var(--accent-dim);
+  }
+
+  /* ===== EVIDENCE PANEL ===== */
+  .evidence { grid-area: evidence; border-left: 1px solid var(--border); }
+  .evidence-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+  .evidence-empty-icon {
+    font-family: var(--mono);
+    font-size: 28px;
+    color: var(--border-bright);
+    margin-bottom: 12px;
+  }
+  .pin-card {
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--accent);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .pin-card:hover { border-color: var(--border-bright); border-left-color: var(--accent); }
+  .pin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .pin-id {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+  }
+  .pin-time {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+  .pin-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .pin-coords {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--info);
+    margin-bottom: 6px;
+  }
+  .pin-note {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.4;
+    font-style: italic;
+  }
+  .pin-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .pin-action {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 3px 6px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .pin-action:hover { color: var(--accent); border-color: var(--accent); }
+  .pin-action.danger:hover { color: var(--danger); border-color: var(--danger); }
+
+  /* ===== TIMELINE ===== */
+  .timeline {
+    grid-area: timeline;
+    background: var(--bg-elev);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+  .timeline-header {
+    height: 36px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elev-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .timeline-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .timeline-body {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 16px 20px;
+    position: relative;
+  }
+  .timeline-track {
+    height: 100%;
+    position: relative;
+    min-width: 100%;
+    display: flex;
+    align-items: center;
+  }
+  .timeline-line {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--border-bright);
+  }
+  .timeline-ticks {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    justify-content: space-between;
+  }
+  .timeline-tick {
+    text-align: center;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 10px;
+    position: relative;
+  }
+  .timeline-tick::before {
+    content: '';
+    position: absolute;
+    top: -3px; left: 50%;
+    width: 1px; height: 7px;
+    background: var(--border-bright);
+    transform: translateX(-50%);
+  }
+  .timeline-event {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    cursor: pointer;
+  }
+  .timeline-event-dot {
+    width: 12px; height: 12px;
+    background: var(--accent);
+    border: 2px solid var(--bg-elev);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--accent);
+    transition: transform 0.15s;
+  }
+  .timeline-event:hover .timeline-event-dot { transform: scale(1.3); }
+  .timeline-event-label {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .timeline-empty {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 11px;
+    font-family: var(--mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    width: 100%;
+  }
+
+  /* Modal for adding pin */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+  }
+  .modal-backdrop.show { display: flex; }
+  .modal {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    width: 420px;
+    max-width: 90vw;
+  }
+  .modal-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 18px;
+  }
+  .modal-body { padding: 18px; }
+  .form-group { margin-bottom: 14px; }
+  .form-label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+  }
+  .form-input, .form-textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    padding: 8px 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+    border-radius: 0;
+  }
+  .form-input:focus, .form-textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .form-textarea { resize: vertical; min-height: 70px; font-family: var(--sans); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-input-mono { font-family: var(--mono); font-size: 12px; }
+  .modal-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* ===== OVERPASS / EXIF UI ===== */
+  .form-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    padding: 8px 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+    border-radius: 0;
+  }
+  .form-select:focus { outline: none; border-color: var(--accent); }
+  .form-hint {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+    line-height: 1.5;
+  }
+  .form-hint code {
+    color: var(--accent);
+    background: var(--bg);
+    padding: 1px 4px;
+    border: 1px solid var(--border);
+  }
+
+  /* Overpass result marker (distinct from evidence pins) */
+  .overpass-marker {
+    width: 10px; height: 10px;
+    background: var(--info);
+    border: 1.5px solid var(--bg);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--info);
+  }
+
+  /* EXIF drop overlay */
+  .drop-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 600;
+    background: rgba(255, 107, 53, 0.10);
+    border: 2px dashed var(--accent);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    backdrop-filter: blur(2px);
+  }
+  .drop-overlay.show { display: flex; }
+  .drop-overlay-text {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    background: rgba(13, 17, 23, 0.95);
+    padding: 14px 22px;
+    border: 1px solid var(--accent);
+  }
+
+  /* Spinner used in overpass status */
+  .spinner {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border: 1.5px solid var(--accent);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Subtle grid background pattern */
+  .map-container::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,107,53,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,107,53,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 400;
+    opacity: 0.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <span>LOCUS</span>
+    </div>
+    <div class="brand-tag">OSINT LOCATION WORKBENCH · v0.1</div>
+    <div class="header-actions">
+      <div class="header-status">
+        <div class="status-dot"></div>
+        <span>OFFLINE · NO DATA INGEST</span>
+      </div>
+      <button class="btn" id="btn-export">EXPORT</button>
+      <button class="btn btn-primary" id="btn-new-case">NEW CASE</button>
+    </div>
+  </header>
+
+  <!-- LAYERS PANEL (LEFT) -->
+  <aside class="panel layers">
+    <div class="panel-header">
+      <span class="panel-title">Data Sources</span>
+    </div>
+    <div class="panel-body">
+
+      <div class="layer-group">
+        <div class="layer-group-title">Base Maps</div>
+        <div class="layer-item active" data-layer="osm">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">OpenStreetMap</div>
+            <div class="layer-meta">tile.openstreetmap.org</div>
+          </div>
+          <div class="layer-badge badge-ready">LIVE</div>
+        </div>
+        <div class="layer-item" data-layer="satellite">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Satellite Imagery</div>
+            <div class="layer-meta">esri.worldimagery</div>
+          </div>
+          <div class="layer-badge badge-ready">LIVE</div>
+        </div>
+        <div class="layer-item" data-layer="terrain">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Terrain / Topo</div>
+            <div class="layer-meta">opentopomap.org</div>
+          </div>
+          <div class="layer-badge badge-ready">LIVE</div>
+        </div>
+      </div>
+
+      <div class="layer-group">
+        <div class="layer-group-title">Aerial / Imagery</div>
+        <div class="layer-item" data-layer="sentinel">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Sentinel-2 (Copernicus)</div>
+            <div class="layer-meta">10m · 5-day refresh</div>
+          </div>
+          <div class="layer-badge badge-stub">STUB</div>
+        </div>
+        <div class="layer-item" data-layer="mapillary">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Mapillary Street View</div>
+            <div class="layer-meta">crowdsourced imagery</div>
+          </div>
+          <div class="layer-badge badge-stub">STUB</div>
+        </div>
+      </div>
+
+      <div class="layer-group">
+        <div class="layer-group-title">Live Feeds</div>
+        <div class="layer-item" data-layer="adsb">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Flight Tracking (ADS-B)</div>
+            <div class="layer-meta">opensky-network.org</div>
+          </div>
+          <div class="layer-badge badge-stub">STUB</div>
+        </div>
+        <div class="layer-item" data-layer="ais">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Vessel Tracking (AIS)</div>
+            <div class="layer-meta">aishub.net</div>
+          </div>
+          <div class="layer-badge badge-stub">STUB</div>
+        </div>
+        <div class="layer-item" data-layer="wifi">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Wi-Fi Geolocation</div>
+            <div class="layer-meta">wigle.net</div>
+          </div>
+          <div class="layer-badge badge-stub">STUB</div>
+        </div>
+      </div>
+
+      <div class="layer-group">
+        <div class="layer-group-title">Analysis Tools</div>
+        <div class="layer-item" data-layer="suncalc">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Sun / Shadow Calc</div>
+            <div class="layer-meta">chronolocation</div>
+          </div>
+          <div class="layer-badge badge-stub">STUB</div>
+        </div>
+        <div class="layer-item" data-layer="overpass">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">Overpass Query (OSM)</div>
+            <div class="layer-meta">feature search</div>
+          </div>
+          <div class="layer-badge badge-ready">LIVE</div>
+        </div>
+        <div class="layer-item" data-layer="exif">
+          <div class="layer-toggle"></div>
+          <div class="layer-info">
+            <div class="layer-name">EXIF Image Parser</div>
+            <div class="layer-meta">drop image on map</div>
+          </div>
+          <div class="layer-badge badge-ready">LIVE</div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- MAP -->
+  <main class="map-container">
+    <div class="map-toolbar">
+      <button class="tool-btn" id="tool-pin" title="Drop pin (click map)">⊕</button>
+      <button class="tool-btn" id="tool-measure" title="Measure distance (stub)">⟷</button>
+      <button class="tool-btn" id="tool-area" title="Draw area (stub)">□</button>
+      <button class="tool-btn" id="tool-locate" title="Locate me">⌖</button>
+    </div>
+    <div id="map"></div>
+    <div class="drop-overlay" id="drop-overlay">
+      <div class="drop-overlay-text">⊕ Drop image to extract GPS</div>
+    </div>
+    <div class="map-readout">
+      LAT <span id="readout-lat">—</span> · LON <span id="readout-lon">—</span> · Z <span id="readout-zoom">2</span>
+    </div>
+  </main>
+
+  <!-- EVIDENCE PANEL (RIGHT) -->
+  <aside class="panel evidence">
+    <div class="panel-header">
+      <span class="panel-title">Evidence · Pins</span>
+      <span class="panel-title" id="pin-count" style="color: var(--accent);">0</span>
+    </div>
+    <div class="panel-body" id="evidence-body">
+      <div class="evidence-empty">
+        <div class="evidence-empty-icon">⊙</div>
+        <div>No evidence pinned yet.</div>
+        <div style="margin-top: 8px; font-size: 11px;">Click the pin tool, then click the map to add a location.</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- TIMELINE -->
+  <section class="timeline">
+    <div class="timeline-header">
+      <span class="panel-title">Investigation Timeline</span>
+      <div class="timeline-controls">
+        <button class="btn" id="btn-timeline-fit">FIT</button>
+        <button class="btn" id="btn-timeline-clear">CLEAR</button>
+      </div>
+    </div>
+    <div class="timeline-body" id="timeline-body">
+      <div class="timeline-empty">— No events on timeline —</div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ADD PIN MODAL -->
+<div class="modal-backdrop" id="pin-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">◆ New Evidence Pin</span>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input type="text" class="form-input" id="pin-title-input" placeholder="e.g. Unidentified vehicle" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Latitude</label>
+          <input type="text" class="form-input form-input-mono" id="pin-lat-input" readonly />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Longitude</label>
+          <input type="text" class="form-input form-input-mono" id="pin-lon-input" readonly />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Timestamp</label>
+        <input type="datetime-local" class="form-input form-input-mono" id="pin-time-input" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes / Observations</label>
+        <textarea class="form-textarea" id="pin-note-input" placeholder="Source, confidence level, cross-references..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="pin-cancel">CANCEL</button>
+      <button class="btn btn-primary" id="pin-save">SAVE PIN</button>
+    </div>
+  </div>
+</div>
+
+<!-- OVERPASS QUERY MODAL -->
+<div class="modal-backdrop" id="overpass-modal">
+  <div class="modal" style="width: 460px;">
+    <div class="modal-header">
+      <span class="modal-title">◆ Overpass / OSM Query</span>
+      <button class="modal-close" id="overpass-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Preset</label>
+        <select class="form-select form-input-mono" id="overpass-preset">
+          <option value="amenity=fuel">Petrol / fuel stations</option>
+          <option value="amenity=atm">ATMs</option>
+          <option value="amenity=bank">Banks</option>
+          <option value="amenity=hospital">Hospitals</option>
+          <option value="amenity=police">Police stations</option>
+          <option value="amenity=charging_station">EV charging stations</option>
+          <option value="tourism=hotel">Hotels</option>
+          <option value="amenity=parking">Parking</option>
+          <option value="amenity=restaurant">Restaurants</option>
+          <option value="amenity=cafe">Cafés</option>
+          <option value="amenity=bar">Bars</option>
+          <option value="amenity=place_of_worship">Places of worship</option>
+          <option value="man_made=surveillance">Surveillance cameras</option>
+          <option value="man_made=tower">Towers / masts</option>
+          <option value="highway=bus_stop">Bus stops</option>
+          <option value="railway=station">Railway stations</option>
+          <option value="aeroway=aerodrome">Airfields</option>
+          <option value="custom">— Custom selector —</option>
+        </select>
+        <div class="form-hint">Tag selector, e.g. <code>amenity=fuel</code>. Choose <code>Custom</code> to write your own.</div>
+      </div>
+      <div class="form-group" id="overpass-custom-group" style="display:none;">
+        <label class="form-label">Custom selector or full body</label>
+        <textarea class="form-textarea form-input-mono" id="overpass-custom" placeholder="amenity=fuel&#10;&#10;-- or a full Overpass body using {{bbox}}:&#10;node[amenity=fuel]({{bbox}});"></textarea>
+        <div class="form-hint">A bare <code>key=value</code> auto-wraps node/way/relation. Anything with <code>;</code> is treated as a full body and gets <code>{{bbox}}</code> substituted.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Bounding box (current map view)</label>
+        <input type="text" class="form-input form-input-mono" id="overpass-bbox" readonly />
+        <div class="form-hint">Pan/zoom then re-open to refresh. Very large bboxes (&gt; 5000 km²) will prompt before running.</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Status</label>
+        <div id="overpass-status" style="font-family: var(--mono); font-size: 11px; color: var(--text-dim); min-height: 16px;">Ready.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="overpass-clear">CLEAR RESULTS</button>
+      <button class="btn" id="overpass-cancel">CLOSE</button>
+      <button class="btn btn-primary" id="overpass-run">RUN QUERY</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden file input for EXIF picker fallback -->
+<input type="file" id="exif-file-input" accept="image/*" multiple style="display:none;" />
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
+<script>
+  // ============ STATE ============
+  const state = {
+    pins: [],
+    pinCounter: 0,
+    pinMode: false,
+    activeLayer: 'osm',
+    markers: new Map(),
+  };
+
+  // ============ MAP INIT ============
+  const map = L.map('map', {
+    center: [20, 0],
+    zoom: 2,
+    zoomControl: true,
+    worldCopyJump: true,
+  });
+
+  const baseLayers = {
+    osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19,
+    }),
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles © Esri',
+      maxZoom: 19,
+    }),
+    terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenTopoMap (CC-BY-SA)',
+      maxZoom: 17,
+    }),
+  };
+
+  baseLayers.osm.addTo(map);
+  let currentBaseLayer = baseLayers.osm;
+
+  // ============ COORDS READOUT ============
+  const readoutLat = document.getElementById('readout-lat');
+  const readoutLon = document.getElementById('readout-lon');
+  const readoutZoom = document.getElementById('readout-zoom');
+
+  map.on('mousemove', (e) => {
+    readoutLat.textContent = e.latlng.lat.toFixed(5);
+    readoutLon.textContent = e.latlng.lng.toFixed(5);
+  });
+  map.on('zoomend', () => {
+    readoutZoom.textContent = map.getZoom();
+  });
+
+  // ============ LAYER PANEL ============
+  document.querySelectorAll('.layer-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const layerKey = item.dataset.layer;
+
+      // Dedicated tools — don't act like base layers or stubs
+      if (layerKey === 'overpass') { openOverpassModal(); return; }
+      if (layerKey === 'exif') {
+        flashStatus('Drop image on map, or choose file…');
+        exifFileInput.click();
+        return;
+      }
+
+      const badge = item.querySelector('.layer-badge');
+      const isStub = badge.classList.contains('badge-stub');
+
+      if (isStub) {
+        item.classList.toggle('active');
+        flashStatus(`Layer "${item.querySelector('.layer-name').textContent}" — not yet implemented`);
+        return;
+      }
+
+      // Base map switching (single-select among base maps)
+      if (baseLayers[layerKey]) {
+        document.querySelectorAll('.layer-item[data-layer]').forEach(other => {
+          if (baseLayers[other.dataset.layer]) other.classList.remove('active');
+        });
+        item.classList.add('active');
+        map.removeLayer(currentBaseLayer);
+        currentBaseLayer = baseLayers[layerKey];
+        currentBaseLayer.addTo(map);
+        state.activeLayer = layerKey;
+      }
+    });
+  });
+
+  // ============ TOOLS ============
+  const toolPin = document.getElementById('tool-pin');
+  const toolLocate = document.getElementById('tool-locate');
+  const toolMeasure = document.getElementById('tool-measure');
+  const toolArea = document.getElementById('tool-area');
+
+  toolPin.addEventListener('click', () => {
+    state.pinMode = !state.pinMode;
+    toolPin.classList.toggle('active', state.pinMode);
+    map.getContainer().style.cursor = state.pinMode ? 'crosshair' : '';
+  });
+
+  toolLocate.addEventListener('click', () => {
+    map.locate({ setView: true, maxZoom: 13 });
+  });
+
+  toolMeasure.addEventListener('click', () => flashStatus('Measure tool — not yet implemented'));
+  toolArea.addEventListener('click', () => flashStatus('Area draw tool — not yet implemented'));
+
+  // ============ ADD PIN FLOW ============
+  const pinModal = document.getElementById('pin-modal');
+  const pinTitleInput = document.getElementById('pin-title-input');
+  const pinLatInput = document.getElementById('pin-lat-input');
+  const pinLonInput = document.getElementById('pin-lon-input');
+  const pinTimeInput = document.getElementById('pin-time-input');
+  const pinNoteInput = document.getElementById('pin-note-input');
+
+  map.on('click', (e) => {
+    if (!state.pinMode) return;
+    openPinModal(e.latlng.lat, e.latlng.lng);
+  });
+
+  function openPinModal(lat, lon) {
+    pinLatInput.value = lat.toFixed(6);
+    pinLonInput.value = lon.toFixed(6);
+    pinTitleInput.value = '';
+    pinNoteInput.value = '';
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    pinTimeInput.value = local;
+    pinModal.classList.add('show');
+    setTimeout(() => pinTitleInput.focus(), 50);
+  }
+
+  function closePinModal() {
+    pinModal.classList.remove('show');
+    state.pinMode = false;
+    toolPin.classList.remove('active');
+    map.getContainer().style.cursor = '';
+  }
+
+  document.getElementById('modal-close').addEventListener('click', closePinModal);
+  document.getElementById('pin-cancel').addEventListener('click', closePinModal);
+
+  document.getElementById('pin-save').addEventListener('click', () => {
+    const title = pinTitleInput.value.trim() || 'Untitled pin';
+    const lat = parseFloat(pinLatInput.value);
+    const lon = parseFloat(pinLonInput.value);
+    const time = pinTimeInput.value;
+    const note = pinNoteInput.value.trim();
+
+    state.pinCounter++;
+    const pin = {
+      id: `EVD-${String(state.pinCounter).padStart(4, '0')}`,
+      title, lat, lon, time, note,
+      created: new Date().toISOString(),
+    };
+    state.pins.push(pin);
+    addPinMarker(pin);
+    renderEvidence();
+    renderTimeline();
+    persist();
+    closePinModal();
+  });
+
+  // ============ PIN MARKERS ============
+  function addPinMarker(pin) {
+    const icon = L.divIcon({
+      className: '',
+      html: '<div class="osint-marker"></div>',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+    });
+    const marker = L.marker([pin.lat, pin.lon], { icon }).addTo(map);
+    marker.bindPopup(`
+      <div style="font-family: var(--mono); font-size: 10px; color: var(--text-faint); margin-bottom: 4px;">${pin.id}</div>
+      <div style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(pin.title)}</div>
+      <div style="font-family: var(--mono); font-size: 10px; color: var(--info);">${pin.lat.toFixed(5)}, ${pin.lon.toFixed(5)}</div>
+      ${pin.note ? `<div style="margin-top: 6px; font-size: 11px; color: var(--text-dim);">${escapeHtml(pin.note)}</div>` : ''}
+    `);
+    state.markers.set(pin.id, marker);
+  }
+
+  function removePinMarker(id) {
+    const m = state.markers.get(id);
+    if (m) { map.removeLayer(m); state.markers.delete(id); }
+  }
+
+  // ============ EVIDENCE RENDERING ============
+  const evidenceBody = document.getElementById('evidence-body');
+  const pinCount = document.getElementById('pin-count');
+
+  function renderEvidence() {
+    pinCount.textContent = state.pins.length;
+    if (state.pins.length === 0) {
+      evidenceBody.innerHTML = `
+        <div class="evidence-empty">
+          <div class="evidence-empty-icon">⊙</div>
+          <div>No evidence pinned yet.</div>
+          <div style="margin-top: 8px; font-size: 11px;">Click the pin tool, then click the map to add a location.</div>
+        </div>`;
+      return;
+    }
+
+    evidenceBody.innerHTML = state.pins.slice().reverse().map(pin => `
+      <div class="pin-card" data-id="${pin.id}">
+        <div class="pin-header">
+          <span class="pin-id">${pin.id}</span>
+          <span class="pin-time">${formatTime(pin.time)}</span>
+        </div>
+        <div class="pin-title">${escapeHtml(pin.title)}</div>
+        <div class="pin-coords">${pin.lat.toFixed(5)}, ${pin.lon.toFixed(5)}</div>
+        ${pin.note ? `<div class="pin-note">${escapeHtml(pin.note)}</div>` : ''}
+        <div class="pin-actions">
+          <button class="pin-action" data-action="focus" data-id="${pin.id}">FOCUS</button>
+          <button class="pin-action" data-action="copy" data-id="${pin.id}">COPY</button>
+          <button class="pin-action danger" data-action="delete" data-id="${pin.id}">DELETE</button>
+        </div>
+      </div>
+    `).join('');
+
+    evidenceBody.querySelectorAll('.pin-action').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const action = btn.dataset.action;
+        const pin = state.pins.find(p => p.id === id);
+        if (!pin) return;
+
+        if (action === 'focus') {
+          map.setView([pin.lat, pin.lon], 14);
+          state.markers.get(id)?.openPopup();
+        } else if (action === 'copy') {
+          navigator.clipboard?.writeText(`${pin.lat.toFixed(6)}, ${pin.lon.toFixed(6)}`);
+          flashStatus(`Copied ${pin.id} coords`);
+        } else if (action === 'delete') {
+          state.pins = state.pins.filter(p => p.id !== id);
+          removePinMarker(id);
+          renderEvidence();
+          renderTimeline();
+          persist();
+        }
+      });
+    });
+
+    evidenceBody.querySelectorAll('.pin-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = card.dataset.id;
+        const pin = state.pins.find(p => p.id === id);
+        if (pin) {
+          map.setView([pin.lat, pin.lon], Math.max(map.getZoom(), 12));
+          state.markers.get(id)?.openPopup();
+        }
+      });
+    });
+  }
+
+  // ============ TIMELINE ============
+  const timelineBody = document.getElementById('timeline-body');
+
+  function renderTimeline() {
+    const events = state.pins.filter(p => p.time).slice().sort((a, b) =>
+      new Date(a.time) - new Date(b.time));
+
+    if (events.length === 0) {
+      timelineBody.innerHTML = '<div class="timeline-empty">— No events on timeline —</div>';
+      return;
+    }
+
+    const times = events.map(e => new Date(e.time).getTime());
+    let min = Math.min(...times);
+    let max = Math.max(...times);
+    if (min === max) { min -= 3600000; max += 3600000; }
+    const span = max - min;
+
+    // Generate 6 evenly spaced ticks
+    const tickCount = 6;
+    const ticks = [];
+    for (let i = 0; i < tickCount; i++) {
+      const t = min + (span * i / (tickCount - 1));
+      ticks.push(new Date(t));
+    }
+
+    timelineBody.innerHTML = `
+      <div class="timeline-track">
+        <div class="timeline-line"></div>
+        <div class="timeline-ticks">
+          ${ticks.map(t => `<div class="timeline-tick">${formatTickTime(t)}</div>`).join('')}
+        </div>
+        ${events.map(e => {
+          const t = new Date(e.time).getTime();
+          const pct = ((t - min) / span) * 100;
+          return `
+            <div class="timeline-event" style="left: ${pct}%;" data-id="${e.id}" title="${escapeHtml(e.title)}">
+              <div class="timeline-event-dot"></div>
+              <div class="timeline-event-label">${e.id}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    timelineBody.querySelectorAll('.timeline-event').forEach(el => {
+      el.addEventListener('click', () => {
+        const pin = state.pins.find(p => p.id === el.dataset.id);
+        if (pin) {
+          map.setView([pin.lat, pin.lon], Math.max(map.getZoom(), 12));
+          state.markers.get(pin.id)?.openPopup();
+        }
+      });
+    });
+  }
+
+  // ============ TIMELINE CONTROLS ============
+  document.getElementById('btn-timeline-fit').addEventListener('click', () => {
+    if (state.pins.length === 0) return;
+    const group = L.featureGroup([...state.markers.values()]);
+    map.fitBounds(group.getBounds().pad(0.2));
+  });
+  document.getElementById('btn-timeline-clear').addEventListener('click', () => {
+    if (state.pins.length === 0) return;
+    if (!confirm('Clear all evidence pins?')) return;
+    state.pins.forEach(p => removePinMarker(p.id));
+    state.pins = [];
+    state.pinCounter = 0;
+    renderEvidence();
+    renderTimeline();
+    persist();
+  });
+
+  // ============ HEADER ACTIONS ============
+  document.getElementById('btn-new-case').addEventListener('click', () => {
+    if (state.pins.length > 0 && !confirm('Start new case? Current evidence will be cleared.')) return;
+    state.pins.forEach(p => removePinMarker(p.id));
+    state.pins = [];
+    state.pinCounter = 0;
+    renderEvidence();
+    renderTimeline();
+    clearStorage();
+    flashStatus('New case started');
+  });
+
+  document.getElementById('btn-export').addEventListener('click', () => {
+    if (state.pins.length === 0) { flashStatus('Nothing to export'); return; }
+    const data = JSON.stringify({
+      case: 'LOCUS-export',
+      exported: new Date().toISOString(),
+      pins: state.pins,
+    }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `locus-case-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ============ UTILITIES ============
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+  function formatTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  }
+  function formatTickTime(d) {
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function flashStatus(msg) {
+    const status = document.querySelector('.header-status span');
+    const prev = status.textContent;
+    status.textContent = msg.toUpperCase();
+    status.style.color = 'var(--accent)';
+    setTimeout(() => {
+      status.textContent = prev;
+      status.style.color = '';
+    }, 2200);
+  }
+
+  // ============ KEYBOARD SHORTCUTS ============
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'p') toolPin.click();
+    if (e.key === 'Escape') {
+      if (pinModal.classList.contains('show')) closePinModal();
+      if (overpassModal.classList.contains('show')) closeOverpassModal();
+    }
+  });
+
+  // ============ STORAGE ============
+  const STORAGE_KEY = 'locus:state:v1';
+
+  function persist() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        pins: state.pins,
+        pinCounter: state.pinCounter,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch (err) {
+      console.warn('LOCUS persist failed:', err);
+    }
+  }
+
+  function restore() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (!Array.isArray(data.pins)) return;
+      state.pins = data.pins;
+      state.pinCounter = data.pinCounter || state.pins.length;
+      state.pins.forEach(addPinMarker);
+      if (state.pins.length > 0) {
+        flashStatus(`Restored ${state.pins.length} pin${state.pins.length === 1 ? '' : 's'}`);
+      }
+    } catch (err) {
+      console.warn('LOCUS restore failed:', err);
+    }
+  }
+
+  function clearStorage() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (err) {}
+  }
+
+  // ============ OVERPASS / OSM QUERY ============
+  const overpassModal = document.getElementById('overpass-modal');
+  const overpassPreset = document.getElementById('overpass-preset');
+  const overpassCustomGroup = document.getElementById('overpass-custom-group');
+  const overpassCustom = document.getElementById('overpass-custom');
+  const overpassBbox = document.getElementById('overpass-bbox');
+  const overpassStatus = document.getElementById('overpass-status');
+  const overpassResults = L.featureGroup();
+  state.overpassActive = false;
+
+  function openOverpassModal() {
+    const b = map.getBounds();
+    overpassBbox.value = `${b.getSouth().toFixed(5)}, ${b.getWest().toFixed(5)}, ${b.getNorth().toFixed(5)}, ${b.getEast().toFixed(5)}`;
+    if (state.overpassActive) {
+      const n = overpassResults.getLayers().length;
+      overpassStatus.textContent = `${n} feature${n === 1 ? '' : 's'} currently on map.`;
+    } else {
+      overpassStatus.textContent = 'Ready.';
+    }
+    overpassModal.classList.add('show');
+  }
+  function closeOverpassModal() { overpassModal.classList.remove('show'); }
+
+  overpassPreset.addEventListener('change', () => {
+    overpassCustomGroup.style.display = overpassPreset.value === 'custom' ? 'block' : 'none';
+  });
+  document.getElementById('overpass-close').addEventListener('click', closeOverpassModal);
+  document.getElementById('overpass-cancel').addEventListener('click', closeOverpassModal);
+
+  document.getElementById('overpass-clear').addEventListener('click', () => {
+    overpassResults.clearLayers();
+    if (state.overpassActive) {
+      map.removeLayer(overpassResults);
+      state.overpassActive = false;
+      document.querySelector('.layer-item[data-layer="overpass"]')?.classList.remove('active');
+    }
+    overpassStatus.textContent = 'Cleared.';
+  });
+
+  document.getElementById('overpass-run').addEventListener('click', runOverpassQuery);
+
+  async function runOverpassQuery() {
+    const b = map.getBounds();
+    const bbox = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+
+    // Soft area check — Overpass is a shared resource
+    const widthKm = haversineKm(b.getSouth(), b.getWest(), b.getSouth(), b.getEast());
+    const heightKm = haversineKm(b.getSouth(), b.getWest(), b.getNorth(), b.getWest());
+    const areaKm2 = widthKm * heightKm;
+    if (areaKm2 > 5000) {
+      if (!confirm(`Bounding box is ~${Math.round(areaKm2).toLocaleString()} km². Query may time out. Continue?`)) return;
+    }
+
+    let body;
+    if (overpassPreset.value === 'custom') {
+      const raw = overpassCustom.value.trim();
+      if (!raw) { overpassStatus.textContent = 'Custom selector is empty.'; return; }
+      if (raw.includes(';')) {
+        body = raw.replace(/\{\{bbox\}\}/g, bbox);
+        if (!body.trim().endsWith(';')) body += ';';
+        if (!/out\s/i.test(body)) body += 'out center tags;';
+      } else {
+        body = `(node[${raw}](${bbox});way[${raw}](${bbox});relation[${raw}](${bbox}););out center tags;`;
+      }
+    } else {
+      const sel = overpassPreset.value;
+      body = `(node[${sel}](${bbox});way[${sel}](${bbox});relation[${sel}](${bbox}););out center tags;`;
+    }
+    const query = `[out:json][timeout:25];${body}`;
+
+    overpassStatus.innerHTML = `<span class="spinner"></span> Querying overpass-api.de…`;
+    try {
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: query,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const data = await res.json();
+      const elements = data.elements || [];
+      renderOverpassResults(elements);
+      overpassStatus.textContent = `${elements.length} feature${elements.length === 1 ? '' : 's'} returned.`;
+    } catch (err) {
+      overpassStatus.textContent = `Error: ${err.message}`;
+      console.warn('Overpass query failed:', err);
+    }
+  }
+
+  function renderOverpassResults(elements) {
+    overpassResults.clearLayers();
+    const icon = L.divIcon({
+      className: '',
+      html: '<div class="overpass-marker"></div>',
+      iconSize: [10, 10],
+      iconAnchor: [5, 5],
+    });
+
+    elements.forEach(el => {
+      const lat = el.lat ?? el.center?.lat;
+      const lon = el.lon ?? el.center?.lon;
+      if (lat == null || lon == null) return;
+      const name = el.tags?.name || el.tags?.brand || el.tags?.operator || '(unnamed)';
+      const tagsHtml = el.tags
+        ? Object.entries(el.tags).map(([k, v]) =>
+            `<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);line-height:1.5;"><span style="color:var(--info);">${escapeHtml(k)}</span> = ${escapeHtml(String(v))}</div>`
+          ).join('')
+        : '<div style="font-family:var(--mono);font-size:10px;color:var(--text-faint);">no tags</div>';
+      const marker = L.marker([lat, lon], { icon });
+      const popupNode = document.createElement('div');
+      popupNode.innerHTML = `
+        <div style="font-family: var(--mono); font-size: 10px; color: var(--text-faint); margin-bottom: 4px;">${escapeHtml(el.type.toUpperCase())} ${el.id}</div>
+        <div style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(name)}</div>
+        <div style="font-family: var(--mono); font-size: 10px; color: var(--info); margin-bottom: 6px;">${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
+        <div style="max-height: 140px; overflow-y: auto; padding: 4px 6px; background: var(--bg); border: 1px solid var(--border); margin-bottom: 8px;">${tagsHtml}</div>
+        <button class="pin-action" data-promote>＋ PROMOTE TO PIN</button>
+      `;
+      popupNode.querySelector('[data-promote]').addEventListener('click', () => {
+        map.closePopup();
+        openPinModal(lat, lon);
+        pinTitleInput.value = name === '(unnamed)' ? `OSM ${el.type} ${el.id}` : name;
+        const notes = [
+          `OSM ${el.type} ${el.id}`,
+          el.tags ? Object.entries(el.tags).map(([k, v]) => `${k}=${v}`).join('\n') : null,
+        ].filter(Boolean).join('\n');
+        pinNoteInput.value = notes;
+      });
+      marker.bindPopup(popupNode);
+      marker.addTo(overpassResults);
+    });
+
+    if (!state.overpassActive) {
+      overpassResults.addTo(map);
+      state.overpassActive = true;
+      document.querySelector('.layer-item[data-layer="overpass"]')?.classList.add('active');
+    }
+  }
+
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  // ============ EXIF (drag-drop + file picker) ============
+  const dropOverlay = document.getElementById('drop-overlay');
+  const exifFileInput = document.getElementById('exif-file-input');
+  const mapContainer = document.querySelector('.map-container');
+  let dragCounter = 0;
+
+  mapContainer.addEventListener('dragenter', (e) => {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    e.preventDefault();
+    dragCounter++;
+    dropOverlay.classList.add('show');
+  });
+  mapContainer.addEventListener('dragover', (e) => {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  mapContainer.addEventListener('dragleave', (e) => {
+    dragCounter = Math.max(0, dragCounter - 1);
+    if (dragCounter === 0) dropOverlay.classList.remove('show');
+  });
+  mapContainer.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    dropOverlay.classList.remove('show');
+    const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'));
+    if (files.length === 0) { flashStatus('No image files in drop'); return; }
+    for (const file of files) await processExifImage(file);
+  });
+
+  exifFileInput.addEventListener('change', async () => {
+    for (const file of Array.from(exifFileInput.files || [])) {
+      await processExifImage(file);
+    }
+    exifFileInput.value = '';
+  });
+
+  async function processExifImage(file) {
+    if (typeof exifr === 'undefined') {
+      flashStatus('EXIF library not loaded');
+      return;
+    }
+    try {
+      const meta = await exifr.parse(file, {
+        gps: true,
+        tiff: true,
+        exif: true,
+        pick: ['latitude', 'longitude', 'DateTimeOriginal', 'CreateDate',
+               'Make', 'Model', 'LensModel',
+               'FNumber', 'ExposureTime', 'ISO', 'FocalLength', 'GPSAltitude'],
+      });
+      if (!meta || meta.latitude == null || meta.longitude == null) {
+        flashStatus(`${file.name}: no GPS in EXIF`);
+        return;
+      }
+      const lat = meta.latitude;
+      const lon = meta.longitude;
+      const when = meta.DateTimeOriginal || meta.CreateDate;
+      const camera = [meta.Make, meta.Model].filter(Boolean).join(' ').trim();
+      const expo = [
+        meta.FNumber ? `f/${meta.FNumber}` : null,
+        meta.ExposureTime ? `${meta.ExposureTime}s` : null,
+        meta.ISO ? `ISO ${meta.ISO}` : null,
+        meta.FocalLength ? `${meta.FocalLength}mm` : null,
+      ].filter(Boolean).join(' · ');
+      const notes = [
+        `Source: ${file.name}`,
+        camera ? `Camera: ${camera}` : null,
+        meta.LensModel ? `Lens: ${meta.LensModel}` : null,
+        expo ? `Exposure: ${expo}` : null,
+        meta.GPSAltitude != null ? `Altitude: ${Math.round(meta.GPSAltitude)} m` : null,
+      ].filter(Boolean).join('\n');
+
+      openPinModal(lat, lon);
+      pinTitleInput.value = `EXIF: ${file.name}`;
+      pinNoteInput.value = notes;
+      if (when instanceof Date && !isNaN(when)) {
+        const local = new Date(when.getTime() - when.getTimezoneOffset() * 60000)
+          .toISOString().slice(0, 16);
+        pinTimeInput.value = local;
+      }
+      map.setView([lat, lon], Math.max(map.getZoom(), 14));
+      flashStatus(`EXIF GPS extracted: ${file.name}`);
+    } catch (err) {
+      console.warn('EXIF parse failed:', err);
+      flashStatus(`EXIF parse failed: ${file.name}`);
+    }
+  }
+
+  // Initial render
+  restore();
+  renderEvidence();
+  renderTimeline();
+</script>
+</body>
+</html>

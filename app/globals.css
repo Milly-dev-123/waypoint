@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Waypoint palette — light theme (default). All values are R G B triples
+   so Tailwind's <alpha-value> token can compose opacity utilities. */
+:root {
+  --bg: 250 250 249;          /* warm off-white */
+  --surface: 255 255 255;
+  --border: 229 226 222;
+  --fg: 28 32 38;             /* near-black with a hint of warm */
+  --muted: 102 110 122;
+
+  --accent: 14 159 142;       /* #0E9F8E — warm teal */
+  --accent-fg: 255 255 255;
+  --accent-soft: 224 244 240;
+
+  /* Reserved exclusively for the persistent "sharing-active" banner. */
+  --alert: 220 96 64;         /* warm orange-red */
+  --alert-fg: 255 255 255;
+  --alert-soft: 252 232 224;
+
+  --danger: 200 50 50;
+}
+
+.dark {
+  --bg: 14 17 22;
+  --surface: 22 26 32;
+  --border: 40 46 54;
+  --fg: 232 234 238;
+  --muted: 148 156 168;
+
+  --accent: 56 197 178;
+  --accent-fg: 9 18 22;
+  --accent-soft: 18 56 52;
+
+  --alert: 236 132 102;
+  --alert-fg: 24 12 8;
+  --alert-soft: 60 28 20;
+
+  --danger: 240 110 110;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg: 14 17 22;
+    --surface: 22 26 32;
+    --border: 40 46 54;
+    --fg: 232 234 238;
+    --muted: 148 156 168;
+
+    --accent: 56 197 178;
+    --accent-fg: 9 18 22;
+    --accent-soft: 18 56 52;
+
+    --alert: 236 132 102;
+    --alert-fg: 24 12 8;
+    --alert-soft: 60 28 20;
+
+    --danger: 240 110 110;
+  }
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-family: var(--font-body), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Focus ring tuned to the accent. Visible everywhere a tab lands. */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}

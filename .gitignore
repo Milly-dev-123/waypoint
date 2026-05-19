@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Production
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+
+# Supabase local stack
+supabase/.branches
+supabase/.temp
+supabase/.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Testing
+coverage/
+.nyc_output
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Certs / secrets accidentally dropped in repo
+*.pem
+
+# Yarn (if ever switched)
+.yarn/install-state.gz
+
+# Misc
+.vercel
