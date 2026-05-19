@@ -22,6 +22,8 @@ next-env.d.ts
 supabase/.branches
 supabase/.temp
 supabase/.env
+# Studio's SQL editor saves drafts here — local-only scratchpad, not source.
+supabase/snippets/
 
 # Logs
 npm-debug.log*

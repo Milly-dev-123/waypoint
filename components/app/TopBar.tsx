@@ -4,7 +4,12 @@ import { SharingIndicator } from './SharingIndicator';
 import { UserMenu } from './UserMenu';
 import type { Profile } from '@/lib/auth/guards';
 
-export function TopBar({ profile }: { profile: Profile }) {
+type Props = {
+  profile: Profile;
+  onShareClick: () => void;
+};
+
+export function TopBar({ profile, onShareClick }: Props) {
   return (
     <header className="z-40 flex items-center justify-between gap-3 border-b border-border bg-surface/95 px-4 py-2.5 backdrop-blur">
       <div className="flex items-center gap-2 font-display text-lg font-semibold">
@@ -12,7 +17,7 @@ export function TopBar({ profile }: { profile: Profile }) {
         Waypoint
       </div>
       <div className="flex items-center gap-3">
-        <SharingIndicator />
+        <SharingIndicator onShareClick={onShareClick} />
         <UserMenu profile={profile} />
       </div>
     </header>
